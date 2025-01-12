@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*[draggable="true"] {
+  cursor: grab;
+}
+
+*[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+*[draggable="true"]:hover {
+  cursor: grab;
+}
+
+*[draggable="true"]:active:hover {
+  cursor: grabbing;
+}
