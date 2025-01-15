@@ -10,7 +10,23 @@ module.exports = {
     "./node_modules/@nextui-org/theme/dist/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      keyframes: {
+        appear: {
+          "0%": {
+            opacity: "0",
+            transform: "scale(0.3)",
+          },
+          "100%": {
+            opacity: "1",
+            transform: "scale(1)",
+          },
+        },
+      },
+      animation: {
+        appear: "appear 0.2s ease-out forwards",
+      },
+    },
   },
   darkMode: "class",
   plugins: [

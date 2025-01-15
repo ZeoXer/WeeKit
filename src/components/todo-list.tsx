@@ -1,168 +1,190 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useDrop } from "react-dnd";
 import clsx from "clsx";
+import { useState } from "react";
+import { useDrop } from "react-dnd";
+import { Button, Divider, Input } from "@nextui-org/react";
 
 import { TodoCard } from "./todo-card";
+import { DeleteIcon, EditIcon, PlusIcon } from "./icons";
 
 type Todo = {
   id: string;
   text: string;
 };
 
-const CARD_HEIGHT = 48;
-const GAP = 16;
+type ScheduleDay = {
+  date: string;
+  dayOfWeek: string;
+  todos: Todo[];
+};
 
-export const TodoList = () => {
-  const [todos, setTodos] = useState<Todo[]>([
-    { id: "1", text: "First Task" },
-    { id: "2", text: "Second Task" },
-    { id: "3", text: "Third Task" },
-  ]);
-  const [draggedItem, setDraggedItem] = useState<Todo | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const dragIndexRef = useRef<number | null>(null);
+export const TodoList = ({
+  todos,
+  setTodos,
+  setSchedules,
+}: {
+  todos: Todo[];
+  setTodos: React.Dispatch<React.SetStateAction<Todo[]>>;
+  setSchedules: React.Dispatch<React.SetStateAction<ScheduleDay[]>>;
+}) => {
+  const [isOverEdit, setIsOverEdit] = useState(false);
+  const [isOverDelete, setIsOverDelete] = useState(false);
+  const [newTodo, setNewTodo] = useState("");
 
-  const handleDragEnd = useCallback(() => {
-    if (dragOverIndex === null || dragIndexRef.current === null) {
-      setDraggedItem(null);
-      setDragOverIndex(null);
-      dragIndexRef.current = null;
-
-      return;
+  const handleAddTodo = () => {
+    if (newTodo.trim() !== "") {
+      setTodos([...todos, { id: Date.now().toString(), text: newTodo }]);
+      setNewTodo("");
     }
+  };
 
-    const draggedIndex = dragIndexRef.current;
-
-    setTodos((prevTodos) => {
-      const newTodos = [...prevTodos];
-      const [draggedItem] = newTodos.splice(draggedIndex, 1);
-
-      newTodos.splice(dragOverIndex, 0, draggedItem);
-
-      return newTodos;
-    });
-
-    // 重置狀態
-    setDraggedItem(null);
-    setDragOverIndex(null);
-    dragIndexRef.current = null;
-  }, [dragOverIndex]);
-
-  useEffect(() => {
-    document.addEventListener("dragend", handleDragEnd);
-
-    return () => document.removeEventListener("dragend", handleDragEnd);
-  }, [handleDragEnd]);
-
+  // 主要區域的 drop target
   const [{ isOver }, drop] = useDrop({
     accept: "TODO_CARD",
-    collect: (monitor) => ({
-      isOver: monitor.isOver(),
-    }),
-    hover: (item: Todo, monitor) => {
-      const draggedId = item.id;
-      const draggedTodo = todos.find((todo) => todo.id === draggedId);
-
-      if (!draggedTodo) return;
-
-      const draggedIndex = todos.findIndex((todo) => todo.id === draggedId);
-
-      dragIndexRef.current = draggedIndex;
-      setDraggedItem(draggedTodo);
-
-      if (!containerRef.current) return;
-
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const clientOffset = monitor.getClientOffset();
-
-      if (!clientOffset) return;
-
-      const mouseY = clientOffset.y - containerRect.top;
-      const containerHeight = containerRect.height - GAP * 2;
-      const maxIndex = todos.length;
-
-      if (mouseY < 0 || mouseY > containerHeight) {
+    drop: (item: { id: string; text: string }, monitor) => {
+      // 如果項目已經被其他 drop target 處理，則不執行任何操作
+      if (monitor.didDrop()) {
         return;
       }
 
-      let newIndex = Math.floor(mouseY / (CARD_HEIGHT + GAP));
-
-      newIndex = Math.min(Math.max(0, newIndex), maxIndex);
-
-      setDragOverIndex(newIndex);
+      // 檢查是否已經存在於 todos 中
+      const exists = todos.some((todo) => todo.id === item.id);
+      if (!exists) {
+        setTodos((prev) => [...prev, { id: item.id, text: item.text }]);
+        // 從所有行程表中移除該項目
+        setSchedules((prev) =>
+          prev.map((day) => ({
+            ...day,
+            todos: day.todos.filter((todo) => todo.id !== item.id),
+          }))
+        );
+      }
     },
+    collect: (monitor) => ({
+      isOver: monitor.isOver(),
+    }),
   });
 
-  const getItemStyle = (index: number) => {
-    if (
-      !draggedItem ||
-      dragOverIndex === null ||
-      dragIndexRef.current === null
-    ) {
-      return {};
-    }
+  // 編輯按鈕的 drop target
+  const [, dropEdit] = useDrop({
+    accept: "TODO_CARD",
+    hover: (_, monitor) => {
+      const isHovering = monitor.isOver();
+      setIsOverEdit(isHovering);
+    },
+    drop: (item: { id: string; text: string }) => {
+      setIsOverEdit(false);
+      // TODO: 在這裡觸發編輯功能
+      console.log("編輯項目:", item);
 
-    const draggedIndex = dragIndexRef.current;
+      // 從行程表中移除
+      setSchedules((prev) =>
+        prev.map((day) => ({
+          ...day,
+          todos: day.todos.filter((todo) => todo.id !== item.id),
+        }))
+      );
 
-    if (index === draggedIndex) {
-      return { visibility: "hidden" };
-    }
+      // 確保項目在左側列表中
+      const exists = todos.some((todo) => todo.id === item.id);
+      if (!exists) {
+        setTodos((prev) => [...prev, { id: item.id, text: item.text }]);
+      }
+    },
+    collect: (monitor) => ({
+      isOver: monitor.isOver(),
+    }),
+  });
 
-    if (
-      draggedIndex < dragOverIndex &&
-      index <= dragOverIndex &&
-      index > draggedIndex
-    ) {
-      return {
-        transform: `translateY(-${CARD_HEIGHT + GAP}px)`,
-        transition: "transform 200ms ease",
-      };
-    }
+  // 刪除按鈕的 drop target
+  const [, dropDelete] = useDrop({
+    accept: "TODO_CARD",
+    hover: (_, monitor) => {
+      const isHovering = monitor.isOver();
+      setIsOverDelete(isHovering);
+    },
+    drop: (item: { id: string }) => {
+      setIsOverDelete(false);
 
-    if (
-      draggedIndex > dragOverIndex &&
-      index >= dragOverIndex &&
-      index < draggedIndex
-    ) {
-      return {
-        transform: `translateY(${CARD_HEIGHT + GAP}px)`,
-        transition: "transform 200ms ease",
-      };
-    }
-
-    return { transition: "transform 200ms ease" };
-  };
+      // 直接從兩個地方移除項目
+      setTodos((prevTodos) => prevTodos.filter((todo) => todo.id !== item.id));
+      setSchedules((prev) =>
+        prev.map((day) => ({
+          ...day,
+          todos: day.todos.filter((todo) => todo.id !== item.id),
+        }))
+      );
+    },
+    collect: (monitor) => ({
+      isOver: monitor.isOver(),
+    }),
+  });
 
   return (
-    <div
-      ref={(node) => {
-        drop(node);
-        if (node) containerRef.current = node;
-      }}
+    <section
+      ref={drop}
       className={clsx(
-        "flex flex-col gap-4 p-4 min-h-[200px] border-2 border-dashed rounded-lg transition-colors relative overflow-hidden",
-        isOver ? "border-primary" : "border-gray-300"
+        "p-5 border-3 rounded-lg transition-colors relative",
+        "md:w-2/5 bg-transparent min-h-[200px]",
+        isOver ? "border-primary" : "border-secondary"
       )}
     >
-      {todos.map((todo, index) => (
-        <div key={todo.id} style={getItemStyle(index)}>
-          <TodoCard id={todo.id}>{todo.text}</TodoCard>
-        </div>
-      ))}
-      {draggedItem && dragOverIndex !== null && (
-        <div
-          className="absolute pointer-events-none opacity-50"
-          style={{
-            top: `${dragOverIndex * (CARD_HEIGHT + GAP) + GAP}px`,
-            left: `${GAP}px`,
-            right: `${GAP}px`,
-            transition: "top 200ms ease",
+      <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+        <Input
+          classNames={{
+            base: "col-span-2 md:col-span-4",
+            input: "bg-transparent text-lg",
+            innerWrapper: "bg-transparent",
+            inputWrapper: "bg-transparent border-2 border-primary",
           }}
+          color="primary"
+          placeholder="請輸入事項..."
+          size="lg"
+          value={newTodo}
+          onChange={(e) => setNewTodo(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              handleAddTodo();
+            }
+          }}
+        />
+        <Button
+          className="col-span-1 bg-primary"
+          size="lg"
+          onPress={handleAddTodo}
         >
-          <TodoCard id={draggedItem.id}>{draggedItem.text}</TodoCard>
-        </div>
-      )}
-    </div>
+          <PlusIcon className="fill-white" />
+        </Button>
+      </div>
+      <Divider className="bg-secondary h-[2px] my-4 rounded-lg" />
+      <div className="flex flex-wrap gap-4">
+        {todos.map((todo) => (
+          <div key={todo.id}>
+            <TodoCard id={todo.id}>{todo.text}</TodoCard>
+          </div>
+        ))}
+      </div>
+      <ul className="flex gap-4 justify-around w-full absolute bottom-5">
+        <li
+          ref={dropEdit}
+          className={clsx(
+            "rounded-full w-12 h-12 bg-primary flex items-center justify-center transition-all duration-300",
+            isOverEdit ? "scale-125" : "scale-100"
+          )}
+          onMouseLeave={() => setIsOverEdit(false)}
+        >
+          <EditIcon className="text-white" />
+        </li>
+        <li
+          ref={dropDelete}
+          className={clsx(
+            "rounded-full w-12 h-12 bg-primary flex items-center justify-center transition-all duration-300",
+            isOverDelete ? "scale-125" : "scale-100"
+          )}
+          onMouseLeave={() => setIsOverDelete(false)}
+        >
+          <DeleteIcon className="fill-white" />
+        </li>
+      </ul>
+    </section>
   );
 };
