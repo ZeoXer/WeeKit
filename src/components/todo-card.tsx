@@ -25,7 +25,7 @@ export const TodoCard = ({
           "transition-transform hover:scale-110 active:scale-100"
         )}
       >
-        <CardBody className="bg-primary w-32 h-[72px] text-center flex items-center justify-center">
+        <CardBody className="bg-primary md:w-36 2xl:w-32 h-[72px] text-center flex items-center justify-center">
           <p className="text-white">{children}</p>
         </CardBody>
       </Card>

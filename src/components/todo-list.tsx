@@ -124,7 +124,7 @@ export const TodoList = ({
       ref={drop}
       className={clsx(
         "p-5 border-3 rounded-lg transition-colors relative",
-        "md:w-2/5 bg-transparent min-h-[200px]",
+        "md:w-1/2 2xl:w-2/5 bg-transparent min-h-[200px]",
         isOver ? "border-primary" : "border-secondary"
       )}
     >

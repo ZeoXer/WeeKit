@@ -84,7 +84,7 @@ export const ScheduleList = ({
   };
 
   return (
-    <section className="md:w-2/5 grid gap-2">
+    <section className="md:w-1/2 2xl:w-2/5 grid gap-2">
       {schedules.map((day, index) => (
         <ScheduleDay
           key={day.dayOfWeek}
